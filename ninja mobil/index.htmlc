@@ -1,0 +1,1587 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Dikey Ninja Challenge</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; touch-action: manipulation; }
+    body { 
+      overflow: hidden; 
+      background: #000;
+      height: 100vh;
+      width: 100vw;
+    }
+    #gameContainer { 
+      position: fixed;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+    }
+    canvas { 
+      display: block;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      image-rendering: crisp-edges;
+      z-index: 1;
+    }
+    #ui {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      font-family: 'Arial', sans-serif;
+      font-size: 16px;
+      text-shadow: 2px 2px 4px #000;
+      z-index: 100;
+      pointer-events: none;
+    }
+    
+    #healthContainer {
+      position: absolute;
+      top: 40px;
+      left: 10px;
+      width: 100px;
+      height: 20px;
+      z-index: 100;
+      border: 2px solid #333;
+      background: #222;
+    }
+    
+    #healthFill {
+      position: absolute;
+      height: 100%;
+      width: 100%;
+      background: #f00;
+      transition: width 0.3s;
+    }
+    
+    #controlsContainer {
+      position: absolute;
+      bottom: 20px;
+      width: 100%;
+      height: 150px;
+      display: flex;
+      justify-content: space-between;
+      z-index: 100;
+    }
+    
+    #leftControls {
+      display: flex;
+      align-items: center;
+      margin-left: 20px;
+    }
+    
+    #rightControls {
+      display: flex;
+      align-items: center;
+      margin-right: 20px;
+    }
+    
+    .action-btn {
+      width: 80px;
+      height: 80px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 50%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: white;
+      font-size: 24px;
+      margin: 0 10px;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      user-select: none;
+      pointer-events: auto;
+    }
+    
+    #leftBtn {
+      background: rgba(255, 255, 255, 0.2);
+    }
+    
+    #rightBtn {
+      background: rgba(255, 255, 255, 0.2);
+    }
+    
+    #jumpBtn {
+      background: rgba(50, 150, 255, 0.5);
+    }
+    
+    #attackBtn1 {
+      background: rgba(255, 50, 50, 0.5);
+    }
+    
+    #attackBtn2 {
+      background: rgba(255, 100, 50, 0.5);
+    }
+    
+    #attackBtn3 {
+      background: rgba(255, 50, 100, 0.5);
+    }
+    
+    #gameOver {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      color: white;
+      font-family: 'Arial', sans-serif;
+      font-size: 36px;
+      z-index: 200;
+    }
+    .restartBtn {
+      margin-top: 20px;
+      padding: 10px 20px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      font-size: 18px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div id="gameContainer">
+    <canvas id="gameCanvas"></canvas>
+    <div id="ui">
+      SCORE: <span id="score">0</span> | 
+      HIGHEST: <span id="highest">0</span> |
+      LEVEL: <span id="level">1</span>
+    </div>
+    
+    <div id="healthContainer">
+      <div id="healthFill" style="width: 100%;"></div>
+    </div>
+    
+    <div id="controlsContainer">
+      <div id="leftControls">
+        <div class="action-btn" id="leftBtn">←</div>
+        <div class="action-btn" id="rightBtn">→</div>
+      </div>
+      
+      <div id="rightControls">
+        <div class="action-btn" id="attackBtn1">⚔️1</div>
+        <div class="action-btn" id="jumpBtn">↑</div>
+        <div class="action-btn" id="attackBtn2">⚔️2</div>
+        <div class="action-btn" id="attackBtn3">⚔️3</div>
+      </div>
+    </div>
+    
+    <div id="gameOver">
+      GAME OVER<br>
+      <div id="finalScore">SCORE: 0</div>
+      <button class="restartBtn" id="restartBtn">RESTART</button>
+    </div>
+  </div>
+
+  <script>
+    const CONFIG = {
+      gameWidth: 800,
+      gameHeight: 20000,
+      viewportWidth: 800,
+      viewportHeight: window.innerHeight,
+      paths: {
+        backgrounds: {
+          level1: "./Backgrounds/Level1.png",
+          level2: "./Backgrounds/Level2.png"
+        },
+        characters: {
+          shinobi: {
+            idle: "./Shinobi/Idle.png",
+            run: "./Shinobi/Run.png",
+            jump: "./Shinobi/Jump.png",
+            attack1: "./Shinobi/Attack.png",
+            attack2: "./Shinobi/Attack2.png",
+            attack3: "./Shinobi/Attack3.png"
+          },
+          zombie: {
+            idle: "./Zombie/Idle.png",
+            walk: "./Zombie/Walk.png",
+            attack: "./Zombie/Attack.png",
+            death: "./Zombie/Death.png"
+          }
+        },
+        obstacles: {
+          saw: "./Obstacles/saw.png",
+          portal: "./Obstacles/portal.png",
+          axe: "./Obstacles/axe.png",
+          tree: "./Obstacles/tree.png",
+          spike: "./Obstacles/spike.png",
+          item1: "./Items/item1.png",
+          item2: "./Items/item2.png",
+          item3: "./Items/item3.png",
+          branch: "./Obstacles/branch.png"
+        },
+        platforms: {
+          platform1: "./Platforms/platform1.png",
+          platform2: "./Platforms/platform2.png"
+        }
+      },
+      player: {
+        width: 70,
+        height: 70,
+        speed: 6,
+        jumpForce: 20,
+        gravity: 0.8,
+        attackCooldown: 0.5,
+        platformDamageRate: 0.05,
+        sawDamageRate: 0.5,
+        axeDamageRate: 0.8,
+        enemyDamageRate: 1.0,
+        spikeDamageRate: 1.5
+      },
+      zombie: {
+        width: 60,
+        height: 60,
+        idleSpeed: 0.5,
+        walkSpeed: 1.5 + Math.random() * 0.5,
+        attackSpeed: 2.0,
+        detectionRange: 120,
+        attackRange: 50,
+        patrolRange: 80,
+        attackCooldown: 1.5,
+        health: 30 + Math.random() * 20
+      },
+      frameCount: {
+        idle: 6,
+        run: 8,
+        jump: 12,
+        attack1: 6,
+        attack2: 3,
+        attack3: 4,
+        
+        zombie_idle: 6,
+        zombie_walk: 10,
+        zombie_attack: 5,
+        zombie_death: 5,
+        
+        saw: 7,
+        axe: 4,
+        tree: 1,
+        spike: 4,
+        item1: 1,
+        item2: 1,
+        item3: 1,
+        branch: 1
+      },
+      animationSpeed: {
+        idle: 0.1,
+        run: 0.08,
+        jump: 0.05,
+        attack1: 0.07,
+        attack2: 0.1,
+        attack3: 0.08,
+        
+        zombie_idle: 0.15,
+        zombie_walk: 0.1,
+        zombie_attack: 0.1,
+        zombie_death: 0.1,
+        
+        saw: 0.1,
+        axe: 0.08,
+        tree: 0.1,
+        spike: 0.1,
+        item1: 0.1,
+        item2: 0.1,
+        item3: 0.1,
+        branch: 0.1
+      },
+      healing: {
+        treeHealRate: 20,
+        treeHealInterval: 1
+      },
+      scoring: {
+        distanceBonus: 0.5,
+        zombieKillBonus: 50,
+        portalBonus: 1000
+      },
+      difficulty: {
+        speedIncrease: 0.0001,
+        zombieSpawnRate: 0.1,
+        damageMultiplier: 0.005
+      },
+      platform: {
+        spacing: 140,
+        minWidth: 120,
+        maxWidth: 300,
+        height: 20,
+        types: ["platform1", "platform2"]
+      }
+    };
+
+    class VerticalNinjaGame {
+      constructor() {
+        this.canvas = document.getElementById('gameCanvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.assets = {};
+        this.keys = {
+          ArrowLeft: false,
+          ArrowRight: false,
+          ' ': false,
+          Shift: false,
+          Control: false,
+          Alt: false
+        };
+        this.cameraY = 0;
+        this.frameIndex = 0;
+        this.animTimer = 0;
+        this.isJumping = false;
+        this.platformDamageTimer = 0;
+        this.sawDamageTimer = 0;
+        this.axeDamageTimer = 0;
+        this.treeHealTimer = 0;
+        this.enemyDamageTimer = 0;
+        this.spikeDamageTimer = 0;
+        this.healingParticles = [];
+        this.score = 0;
+        this.highestScore = localStorage.getItem('highestScore') || 0;
+        this.platforms = [];
+        this.obstacles = [];
+        this.items = [];
+        this.zombies = [];
+        this.portal = null;
+        this.platformCount = 0;
+        this.lastPlatformY = 0;
+        this.difficultyMultiplier = 1;
+        this.currentLevel = 1;
+        this.platformSeed = 12345;
+        
+        this.init();
+      }
+
+      generateLevel() {
+        const seededRandom = (seed) => {
+          const x = Math.sin(seed++) * 10000;
+          return x - Math.floor(x);
+        };
+        
+        // Başlangıç platformu
+        const startX = CONFIG.gameWidth / 2 - 100;
+        this.platforms.push({
+          x: startX,
+          y: CONFIG.gameHeight - 150,
+          width: 200,
+          height: CONFIG.platform.height,
+          type: "platform1"
+        });
+        
+        const platformSpacing = CONFIG.platform.spacing;
+        const minGap = 60;
+        const maxPlatforms = this.currentLevel === 1 ? 50 : 100;
+        
+        // Platform pozisyonlarını önceden hesapla ve sakla
+        const platformPositions = [];
+        
+        for (let i = 1; i <= maxPlatforms; i++) {
+          const platformY = CONFIG.gameHeight - 150 - (i * platformSpacing);
+          
+          // Platform genişliğini rastgele belirle
+          let platformWidth = CONFIG.platform.minWidth + 
+                             Math.floor(seededRandom(this.platformSeed + i) * (CONFIG.platform.maxWidth - CONFIG.platform.minWidth));
+          
+          // Özel büyük platformlar ekle (birleşik platformlar)
+          if (i % 10 === 0) {
+            platformWidth = 300 + Math.floor(seededRandom(this.platformSeed + i * 2) * 100);
+          }
+          
+          let platformX;
+          let attempts = 0;
+          const maxAttempts = 10;
+          
+          do {
+            platformX = 50 + Math.floor(seededRandom(this.platformSeed + i * 2 + attempts) * (CONFIG.gameWidth - 100 - platformWidth));
+            attempts++;
+            
+            if (attempts >= maxAttempts) {
+              const prevPlatform = platformPositions[platformPositions.length - 1] || this.platforms[0];
+              platformX = prevPlatform.x + (seededRandom(this.platformSeed + i * 3) > 0.5 ? 100 : -100);
+              if (platformX < 50) platformX = 50;
+              if (platformX + platformWidth > CONFIG.gameWidth - 50) platformX = CONFIG.gameWidth - 50 - platformWidth;
+              break;
+            }
+            
+            let collision = false;
+            for (let j = Math.max(0, platformPositions.length - 5); j < platformPositions.length; j++) {
+              const plat = platformPositions[j];
+              if (plat && Math.abs(plat.y - platformY) < platformSpacing * 0.8 && 
+                  ((platformX + platformWidth > plat.x && platformX < plat.x + plat.width))) {
+                collision = true;
+                break;
+              }
+            }
+            
+            if (!collision) break;
+          } while (attempts < maxAttempts);
+          
+          const platformType = CONFIG.platform.types[Math.floor(seededRandom(this.platformSeed + i * 4) * 2)];
+          
+          const platform = {
+            x: platformX,
+            y: platformY,
+            width: platformWidth,
+            height: CONFIG.platform.height,
+            type: platformType
+          };
+          
+          platformPositions.push(platform);
+          this.platforms.push(platform);
+          
+          // Her 10 platformda bir ağaç ekle (büyük platformlara)
+          if (i % 10 === 0) {
+            this.obstacles.push({
+              x: platformX + platformWidth/2 - 60,
+              y: platformY - 110,
+              type: "tree",
+              frame: 0,
+              width: 120,
+              height: 120
+            });
+            
+            // Büyük platformlarda item2 ekle (ağacın yanına)
+            this.items.push({
+              x: platformX + platformWidth/2 - 100,
+              y: platformY - 50,
+              type: "item2",
+              frame: 0,
+              width: 60,
+              height: 60,
+              collected: false
+            });
+          }
+          
+          // Normal platformlarda item3 ekle (her platformda max 1 tane)
+          else if (seededRandom(this.platformSeed + i * 5) < 0.3) {
+            this.items.push({
+              x: platformX + platformWidth/2 - 30,
+              y: platformY - 50,
+              type: "item3",
+              frame: 0,
+              width: 60,
+              height: 60,
+              collected: false
+            });
+          }
+          
+          // Zombi platformları (daha büyük platformlarda)
+          if ((i + 1) % 20 === 0 || (i + 2) % 20 === 0) {
+            const zombiePlatformHeight = CONFIG.platform.height * 3;
+            const zombiePlatformY = platformY - platformSpacing;
+            
+            this.platforms.push({
+              x: platformX,
+              y: zombiePlatformY,
+              width: platformWidth,
+              height: zombiePlatformHeight,
+              type: "platform2"
+            });
+            
+            // Zombi ekle
+            this.zombies.push({
+              x: platformX + platformWidth/2,
+              y: zombiePlatformY - 60,
+              type: "platform",
+              health: CONFIG.zombie.health,
+              state: "idle",
+              frame: 0,
+              direction: seededRandom(this.platformSeed + i * 6) > 0.5 ? 1 : -1,
+              attackCooldown: 0,
+              isDead: false,
+              originalX: platformX + platformWidth/2,
+              patrolTimer: 0,
+              velocityY: 0,
+              isGrounded: true
+            });
+          }
+          
+          // Tekli zombi ekle
+          const heightFactor = i / maxPlatforms;
+          if (!((i + 1) % 20 === 0 || (i + 2) % 20 === 0) && 
+              seededRandom(this.platformSeed + i * 5) < CONFIG.difficulty.zombieSpawnRate + heightFactor * 0.2) {
+            this.zombies.push({
+              x: platformX + platformWidth/2,
+              y: platformY - 60,
+              type: "platform",
+              health: CONFIG.zombie.health,
+              state: "idle",
+              frame: 0,
+              direction: seededRandom(this.platformSeed + i * 7) > 0.5 ? 1 : -1,
+              attackCooldown: 0,
+              isDead: false,
+              originalX: platformX + platformWidth/2,
+              patrolTimer: 0,
+              velocityY: 0,
+              isGrounded: true
+            });
+          }
+          
+          // Tuzak ekleme
+          const trapChance = 0.2;
+          if (i % 7 === 0 && seededRandom(this.platformSeed + i * 8) < trapChance) {
+            this.obstacles.push({
+              x: platformX + platformWidth/2 - 20,
+              y: platformY - 40,
+              type: "saw",
+              frame: 0,
+              width: 40,
+              height: 40
+            });
+          } else if (i % 7 === 2 && seededRandom(this.platformSeed + i * 9) < trapChance) {
+            this.obstacles.push({
+              x: platformX + platformWidth/2 - 25,
+              y: platformY + 5,
+              type: "axe",
+              frame: 0,
+              width: 50,
+              height: 50
+            });
+          } else if (seededRandom(this.platformSeed + i * 10) < trapChance * 0.3) {
+            this.obstacles.push({
+              x: platformX + platformWidth/2 - 20,
+              y: platformY - 35,
+              type: "spike",
+              frame: 0,
+              width: 40,
+              height: 40
+            });
+          }
+          
+          this.lastPlatformY = platformY;
+        }
+        
+        // Kenarlara dal platformları ekle (1-2 cm içeride ve karşılıklı)
+        for (let i = 0; i < maxPlatforms; i += 5) {
+          const platformY = CONFIG.gameHeight - 150 - (i * platformSpacing);
+          
+          // Sol kenar dalı (sağa doğru uzanan)
+          this.obstacles.push({
+            x: 20, // 1-2 cm içeride
+            y: platformY - 40,
+            type: "branch",
+            frame: 0,
+            width: 100,
+            height: 30,
+            isPlatform: true,
+            direction: "right"
+          });
+          
+          // Sağ kenar dalı (sola doğru uzanan)
+          this.obstacles.push({
+            x: CONFIG.gameWidth - 120, // 1-2 cm içeride
+            y: platformY - 40,
+            type: "branch",
+            frame: 0,
+            width: 100,
+            height: 30,
+            isPlatform: true,
+            direction: "left"
+          });
+        }
+        
+        // Portal pozisyonu (5000 skordan sonra)
+        this.portal = {
+          x: CONFIG.gameWidth / 2 - 40,
+          y: -10000 / CONFIG.scoring.distanceBonus + CONFIG.gameHeight - 150,
+          width: 80,
+          height: 80,
+          frame: 0,
+          frameCount: 4
+        };
+        
+        this.platformCount = this.platforms.length;
+      }
+
+      loadGame() {
+        this.state = {
+          player: {
+            x: CONFIG.gameWidth / 2 - CONFIG.player.width / 2,
+            y: CONFIG.gameHeight - 150 - CONFIG.player.height,
+            currentAnim: "idle",
+            facing: "right",
+            velocityY: 0,
+            isGrounded: true,
+            isAttacking: false,
+            attackType: "",
+            attackCooldown: 0,
+            onPlatform1: false,
+            nearSaw: false,
+            nearAxe: false,
+            nearTree: false,
+            nearZombie: false,
+            nearSpike: false,
+            speedMultiplier: 1,
+            highestY: CONFIG.gameHeight - 150
+          },
+          health: 100,
+          gameOver: false
+        };
+        
+        document.getElementById('score').textContent = 0;
+        document.getElementById('highest').textContent = this.highestScore;
+        document.getElementById('level').textContent = this.currentLevel;
+        document.getElementById('healthFill').style.width = '100%';
+        this.difficultyMultiplier = 1;
+      }
+
+      async init() {
+        this.setupCanvas();
+        this.setupControls();
+        await this.loadAssets();
+        this.generateLevel();
+        this.loadGame();
+        this.gameLoop();
+      }
+
+      async loadAssets() {
+        // Arkaplanlar
+        for (const [name, path] of Object.entries(CONFIG.paths.backgrounds)) {
+          this.assets[name] = await this.loadImage(path);
+        }
+        
+        // Oyuncu assetleri
+        for (const [name, path] of Object.entries(CONFIG.paths.characters.shinobi)) {
+          this.assets[name] = await this.loadImage(path);
+        }
+        
+        // Zombi assetleri
+        for (const [name, path] of Object.entries(CONFIG.paths.characters.zombie)) {
+          this.assets[`zombie_${name}`] = await this.loadImage(path);
+        }
+        
+        // Tuzaklar ve eşyalar
+        for (const [name, path] of Object.entries(CONFIG.paths.obstacles)) {
+          this.assets[name] = await this.loadImage(path);
+        }
+        
+        // Platformlar
+        for (const [name, path] of Object.entries(CONFIG.paths.platforms)) {
+          this.assets[name] = await this.loadImage(path);
+        }
+      }
+
+      loadImage(src) {
+        return new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => resolve(img);
+          img.onerror = () => {
+            console.error("Error loading image:", src);
+            // Fallback olarak renkli bir kare oluştur
+            const canvas = document.createElement('canvas');
+            canvas.width = 100;
+            canvas.height = 100;
+            const ctx = canvas.getContext('2d');
+            
+            if (src.includes('background')) {
+              ctx.fillStyle = '#112233';
+            } else if (src.includes('platform')) {
+              ctx.fillStyle = '#8B4513';
+            } else if (src.includes('zombie')) {
+              ctx.fillStyle = '#00FF00';
+            } else if (src.includes('branch')) {
+              ctx.fillStyle = '#654321';
+            } else if (src.includes('item')) {
+              ctx.fillStyle = '#FFD700';
+            } else {
+              ctx.fillStyle = '#FF00FF';
+            }
+            
+            ctx.fillRect(0, 0, 100, 100);
+            resolve(canvas);
+          };
+          img.src = src;
+        });
+      }
+
+      setupCanvas() {
+        const updateSize = () => {
+          this.canvas.width = CONFIG.viewportWidth;
+          this.canvas.height = window.innerHeight;
+          CONFIG.viewportHeight = window.innerHeight;
+          
+          this.cameraMaxY = CONFIG.gameHeight - this.canvas.height;
+        };
+        
+        updateSize();
+        window.addEventListener('resize', updateSize);
+        window.addEventListener('orientationchange', updateSize);
+      }
+
+      setupControls() {
+        const addBtnEvents = (btn, key) => {
+          const start = (e) => {
+            e.preventDefault();
+            this.keys[key] = true;
+          };
+          
+          const end = (e) => {
+            if (!e) return;
+            e.preventDefault();
+            this.keys[key] = false;
+          };
+          
+          btn.addEventListener('touchstart', start, { passive: false });
+          btn.addEventListener('touchend', end, { passive: false });
+          btn.addEventListener('touchcancel', end, { passive: false });
+          btn.addEventListener('mousedown', start);
+          btn.addEventListener('mouseup', end);
+          btn.addEventListener('mouseleave', end);
+        };
+        
+        addBtnEvents(document.getElementById('leftBtn'), 'ArrowLeft');
+        addBtnEvents(document.getElementById('rightBtn'), 'ArrowRight');
+        addBtnEvents(document.getElementById('jumpBtn'), ' ');
+        addBtnEvents(document.getElementById('attackBtn1'), 'Shift');
+        addBtnEvents(document.getElementById('attackBtn2'), 'Control');
+        addBtnEvents(document.getElementById('attackBtn3'), 'Alt');
+        
+        document.getElementById('restartBtn').addEventListener('click', () => this.restartGame());
+      }
+
+      gameLoop() {
+        if (this.state.gameOver) {
+          document.getElementById('gameOver').style.display = 'flex';
+          document.getElementById('finalScore').textContent = `SCORE: ${this.score}`;
+          return;
+        }
+        
+        this.update();
+        this.render();
+        requestAnimationFrame(() => this.gameLoop());
+      }
+
+      update() {
+        const p = this.state.player;
+        const dt = 0.016;
+        
+        const heightDifficulty = Math.max(0, (CONFIG.gameHeight - 150 - p.highestY) / (CONFIG.gameHeight - (CONFIG.gameHeight - 150)));
+        this.difficultyMultiplier = 1 + (heightDifficulty * 2);
+        
+        const damageReduction = this.currentLevel === 1 ? Math.min(0.7, this.score / 5000) : 0;
+       
+        if (this.state.health <= 0) {
+          this.state.health = 0;
+          this.state.gameOver = true;
+          
+          if (this.score > this.highestScore) {
+            this.highestScore = this.score;
+            localStorage.setItem('highestScore', this.highestScore);
+          }
+          return;
+        } else if (this.state.health > 100) {
+          this.state.health = 100;
+        }
+        
+        document.getElementById('healthFill').style.width = `${this.state.health}%`;
+        
+        // Portal kontrolü (5000 skordan sonra)
+        if (this.score >= 5000 && this.portal && 
+            p.x + CONFIG.player.width > this.portal.x && 
+            p.x < this.portal.x + this.portal.width && 
+            p.y + CONFIG.player.height > this.portal.y && 
+            p.y < this.portal.y + this.portal.height) {
+          
+          if (this.currentLevel === 1) {
+            this.currentLevel = 2;
+            this.score += CONFIG.scoring.portalBonus;
+            this.platforms = [];
+            this.obstacles = [];
+            this.items = [];
+            this.zombies = [];
+            this.healingParticles = [];
+            this.generateLevel();
+            this.loadGame();
+            return;
+          } else {
+            this.score += CONFIG.scoring.portalBonus;
+            this.restartGame();
+            return;
+          }
+        }
+        
+        // Skor güncelleme
+        const currentHeight = CONFIG.gameHeight - p.y;
+        this.score = Math.max(0, Math.floor(currentHeight * CONFIG.scoring.distanceBonus));
+        if (p.y < p.highestY) {
+          p.highestY = p.y;
+        }
+        document.getElementById('score').textContent = this.score;
+        
+        // Animasyon güncelleme
+        this.animTimer += dt;
+        const currentAnimSpeed = CONFIG.animationSpeed[p.currentAnim] || 0.1;
+        if (this.animTimer > currentAnimSpeed) {
+          this.animTimer = 0;
+          const frameCount = CONFIG.frameCount[p.currentAnim] || 6;
+          this.frameIndex = (this.frameIndex + 1) % frameCount;
+          
+          if (p.isAttacking && this.frameIndex === 0) {
+            p.isAttacking = false;
+            p.attackType = "";
+          }
+        }
+      
+        // Portal animasyonu
+        if (this.portal) {
+          this.portal.frame = (this.portal.frame + 0.05) % this.portal.frameCount;
+        }
+        
+        // Tuzak animasyonları
+        for (const obs of this.obstacles) {
+          if (obs.type === "saw") {
+            obs.frame = (obs.frame + CONFIG.animationSpeed.saw) % CONFIG.frameCount.saw;
+          } else if (obs.type === "axe") {
+            obs.frame = (obs.frame + CONFIG.animationSpeed.axe) % CONFIG.frameCount.axe;
+          } else if (obs.type === "tree") {
+            obs.frame = (obs.frame + CONFIG.animationSpeed.tree) % CONFIG.frameCount.tree;
+          } else if (obs.type === "spike") {
+            obs.frame = (obs.frame + CONFIG.animationSpeed.spike) % CONFIG.frameCount.spike;
+          }
+        }
+        
+        // Eşya animasyonları
+        for (const item of this.items) {
+          if (item.type === "item1") {
+            item.frame = (item.frame + CONFIG.animationSpeed.item1) % CONFIG.frameCount.item1;
+          } else if (item.type === "item2") {
+            item.frame = (item.frame + CONFIG.animationSpeed.item2) % CONFIG.frameCount.item2;
+          } else if (item.type === "item3") {
+            item.frame = (item.frame + CONFIG.animationSpeed.item3) % CONFIG.frameCount.item3;
+          }
+        }
+        
+        // Zombi güncellemeleri
+        this.updateZombies(dt);
+        
+        // Saldırı kontrolleri
+        if (p.attackCooldown > 0) p.attackCooldown -= dt;
+        
+        if (!p.isAttacking && p.attackCooldown <= 0) {
+          if (this.keys.Shift) {
+            p.isAttacking = true;
+            p.attackType = "attack1";
+            p.currentAnim = "attack1";
+            this.frameIndex = 0;
+            p.attackCooldown = CONFIG.player.attackCooldown;
+            this.checkZombieHit("attack1");
+          } else if (this.keys.Control) {
+            p.isAttacking = true;
+            p.attackType = "attack2";
+            p.currentAnim = "attack2";
+            this.frameIndex = 0;
+            p.attackCooldown = CONFIG.player.attackCooldown;
+            this.checkZombieHit("attack2");
+          } else if (this.keys.Alt) {
+            p.isAttacking = true;
+            p.attackType = "attack3";
+            p.currentAnim = "attack3";
+            this.frameIndex = 0;
+            p.attackCooldown = CONFIG.player.attackCooldown;
+            this.checkZombieHit("attack3");
+          }
+        }
+        
+        // Hareket kontrolü
+        if (!p.isAttacking) {
+          if (this.keys.ArrowLeft) {
+            p.x -= CONFIG.player.speed * p.speedMultiplier;
+            p.facing = "left";
+          }
+          if (this.keys.ArrowRight) {
+            p.x += CONFIG.player.speed * p.speedMultiplier;
+            p.facing = "right";
+          }
+          if (this.keys[' '] && p.isGrounded) {
+            p.velocityY = -CONFIG.player.jumpForce;
+            p.isGrounded = false;
+            p.currentAnim = "jump";
+            this.isJumping = true;
+          }
+        }
+        
+        // Yerçekimi
+        p.velocityY += CONFIG.player.gravity;
+        p.y += p.velocityY;
+        p.isGrounded = false;
+        p.onPlatform1 = false;
+        p.nearSaw = false;
+        p.nearAxe = false;
+        p.nearTree = false;
+        p.nearZombie = false;
+        p.nearSpike = false;
+        p.speedMultiplier = 1;
+        
+        // Platform çarpışması
+        for (const plat of this.platforms) {
+          if (p.x + CONFIG.player.width > plat.x && 
+              p.x < plat.x + plat.width && 
+              p.y + CONFIG.player.height >= plat.y && 
+              p.y + CONFIG.player.height <= plat.y + 20 && 
+              p.velocityY >= 0) {
+            p.y = plat.y - CONFIG.player.height;
+            p.velocityY = 0;
+            p.isGrounded = true;
+            this.isJumping = false;
+            
+            if (plat.type === "platform1") {
+              p.onPlatform1 = true;
+              p.speedMultiplier = 0.7;
+            }
+          }
+        }
+        
+        // Dal platformları çarpışması (zıplama seviyesi ayarlandı)
+        for (const obs of this.obstacles) {
+          if (obs.isPlatform && 
+              p.x + CONFIG.player.width > obs.x && 
+              p.x < obs.x + obs.width && 
+              p.y + CONFIG.player.height >= obs.y && 
+              p.y + CONFIG.player.height <= obs.y + 15 && 
+              p.velocityY >= 0) {
+            p.y = obs.y - CONFIG.player.height;
+            p.velocityY = 0;
+            p.isGrounded = true;
+            this.isJumping = false;
+          }
+        }
+        
+        // Tuzak çarpışması
+        for (const obs of this.obstacles) {
+          if (obs.type === "saw") {
+            const dx = p.x + CONFIG.player.width / 2 - (obs.x + obs.width / 2);
+            const dy = p.y + CONFIG.player.height / 2 - (obs.y + obs.height / 2);
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const minDistance = (CONFIG.player.width + obs.width) / 3;
+            
+            if (distance < minDistance) {
+              p.nearSaw = true;
+            }
+          } else if (obs.type === "axe") {
+            const dx = p.x + CONFIG.player.width / 2 - (obs.x + obs.width / 2);
+            const dy = p.y + CONFIG.player.height / 2 - (obs.y + obs.height / 2);
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const minDistance = (CONFIG.player.width + obs.width) / 2.5;
+            
+            if (distance < minDistance) {
+              p.nearAxe = true;
+            }
+          } else if (obs.type === "tree") {
+            const dx = p.x + CONFIG.player.width / 2 - (obs.x + obs.width / 2);
+            const dy = p.y + CONFIG.player.height / 2 - (obs.y + obs.height / 2);
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const minDistance = (CONFIG.player.width + obs.width) / 2;
+            
+            if (distance < minDistance) {
+              p.nearTree = true;
+            }
+          } else if (obs.type === "spike") {
+            const dx = p.x + CONFIG.player.width / 2 - (obs.x + obs.width / 2);
+            const dy = p.y + CONFIG.player.height / 2 - (obs.y + obs.height / 2);
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const minDistance = (CONFIG.player.width + obs.width) / 2.5;
+            
+            if (distance < minDistance) {
+              p.nearSpike = true;
+            }
+          }
+        }
+        
+        // Zombi çarpışma kontrolü
+        for (const zombie of this.zombies) {
+          if (zombie.isDead) continue;
+          
+          const dx = p.x + CONFIG.player.width / 2 - (zombie.x + CONFIG.zombie.width / 2);
+          const dy = p.y + CONFIG.player.height / 2 - (zombie.y + CONFIG.zombie.height / 2);
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          const minDistance = (CONFIG.player.width + CONFIG.zombie.width) / 2;
+          
+          if (distance < minDistance) {
+            p.nearZombie = true;
+          }
+        }
+        
+        // Hasar mekanikleri
+        if (p.onPlatform1) {
+          this.platformDamageTimer += dt;
+          if (this.platformDamageTimer >= 1) {
+            this.platformDamageTimer = 0;
+            this.state.health -= CONFIG.player.platformDamageRate * this.difficultyMultiplier * (1 - damageReduction);
+          }
+        } else {
+          this.platformDamageTimer = 0;
+        }
+        
+        if (p.nearAxe) {
+          this.axeDamageTimer += dt;
+          if (this.axeDamageTimer >= 0.5) {
+            this.axeDamageTimer = 0;
+            this.state.health -= CONFIG.player.axeDamageRate * this.difficultyMultiplier * (1 - damageReduction);
+          }
+        } else {
+          this.axeDamageTimer = 0;
+        }
+        
+        if (p.nearZombie) {
+          this.enemyDamageTimer += dt;
+          if (this.enemyDamageTimer >= 1) {
+            this.enemyDamageTimer = 0;
+            this.state.health -= CONFIG.player.enemyDamageRate * this.difficultyMultiplier * (1 - damageReduction);
+          }
+        } else {
+          this.enemyDamageTimer = 0;
+        }
+        
+        // Diken hasarı
+        if (p.nearSpike) {
+          this.spikeDamageTimer += dt;
+          if (this.spikeDamageTimer >= 0.3) {
+            this.spikeDamageTimer = 0;
+            this.state.health -= CONFIG.player.spikeDamageRate * this.difficultyMultiplier * (1 - damageReduction);
+          }
+        } else {
+          this.spikeDamageTimer = 0;
+        }
+        
+        // Ağaç iyileştirme
+        if (p.nearTree) {
+          this.treeHealTimer += dt;
+          if (this.treeHealTimer >= CONFIG.healing.treeHealInterval) {
+            this.treeHealTimer = 0;
+            this.state.health += CONFIG.healing.treeHealRate;
+            if (this.state.health > 100) this.state.health = 100;
+            
+            // İyileşme partikülleri
+            for (let i = 0; i < 3; i++) {
+              this.healingParticles.push({
+                x: p.x + Math.random() * CONFIG.player.width,
+                y: p.y - Math.random() * 50,
+                size: 5 + Math.random() * 10,
+                alpha: 1,
+                speed: 0.5 + Math.random() * 1.5,
+                color: `rgba(255, 255, ${Math.random() > 0.5 ? 100 : 200}, 1)`
+              });
+            }
+          }
+        } else {
+          this.treeHealTimer = 0;
+        }
+        
+        // Partikül güncelleme
+        for (let i = this.healingParticles.length - 1; i >= 0; i--) {
+          const part = this.healingParticles[i];
+          part.y -= part.speed;
+          part.alpha -= 0.02;
+          
+          if (part.alpha <= 0) {
+            this.healingParticles.splice(i, 1);
+          }
+        }
+        
+        // Animasyon durumu güncelleme
+        if (!p.isAttacking) {
+          if (!p.isGrounded) {
+            p.currentAnim = "jump";
+          } else if (this.keys.ArrowLeft || this.keys.ArrowRight) {
+            p.currentAnim = "run";
+          } else {
+            p.currentAnim = "idle";
+          }
+        }
+        
+        // Kamera takibi (dikey)
+        this.cameraY = p.y - this.canvas.height / 2 + CONFIG.player.height / 2;
+        
+        // Kamera sınırları
+        this.cameraY = Math.max(0, Math.min(this.cameraY, CONFIG.gameHeight - this.canvas.height));
+      }
+
+      updateZombies(dt) {
+        const p = this.state.player;
+        
+        for (let i = this.zombies.length - 1; i >= 0; i--) {
+          const zombie = this.zombies[i];
+          if (zombie.isDead) {
+            // Zombi ölüm animasyonu
+            const animType = `zombie_${zombie.state}`;
+            const animSpeed = CONFIG.animationSpeed[animType] || 0.1;
+            zombie.frame = (zombie.frame + animSpeed) % CONFIG.frameCount[animType];
+            
+            // Animasyon bitince zombiyi kaldır
+            if (zombie.frame >= CONFIG.frameCount.zombie_death - 1) {
+              this.zombies.splice(i, 1);
+            }
+            continue;
+          }
+          
+          // Zombilere yerçekimi uygula
+          zombie.velocityY += CONFIG.player.gravity;
+          zombie.y += zombie.velocityY;
+          zombie.isGrounded = false;
+          
+          // Platform çarpışması - Daha sağlam bir kontrol
+          let onPlatform = false;
+          for (const plat of this.platforms) {
+            if (zombie.x + CONFIG.zombie.width > plat.x && 
+                zombie.x < plat.x + plat.width && 
+                zombie.y + CONFIG.zombie.height >= plat.y && 
+                zombie.y + CONFIG.zombie.height <= plat.y + 15 && 
+                zombie.velocityY >= 0) {
+              zombie.y = plat.y - CONFIG.zombie.height;
+              zombie.velocityY = 0;
+              zombie.isGrounded = true;
+              onPlatform = true;
+              break;
+            }
+          }
+          
+          // Eğer zombi platformda değilse, orijinal pozisyonuna geri dön
+          if (!onPlatform && zombie.type === "platform") {
+            zombie.x = zombie.originalX;
+          }
+          
+          // Zombi animasyon güncelleme
+          const animType = `zombie_${zombie.state}`;
+          const animSpeed = CONFIG.animationSpeed[animType] || 0.1;
+          zombie.frame = (zombie.frame + animSpeed) % CONFIG.frameCount[animType];
+          
+          // Zombi AI - Daha yakın mesafede tespit
+          const dx = p.x - zombie.x;
+          const dy = p.y - zombie.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          
+          // Sadece aynı platformda veya çok yakınsa saldır
+          const samePlatform = this.checkSamePlatform(p, zombie);
+          
+          if ((distance < CONFIG.zombie.detectionRange * 0.6 || samePlatform) && Math.abs(dy) < 100) {
+            if (distance < CONFIG.zombie.attackRange) {
+              // Saldırı modu
+              zombie.state = "attack";
+              
+              if (zombie.attackCooldown <= 0) {
+                zombie.attackCooldown = CONFIG.zombie.attackCooldown;
+              } else {
+                zombie.attackCooldown -= dt;
+              }
+              
+              zombie.direction = dx > 0 ? 1 : -1;
+            } else {
+              // Takip modu
+              zombie.state = "walk";
+              
+              if (zombie.isGrounded) {
+                zombie.x += zombie.direction * CONFIG.zombie.walkSpeed * this.difficultyMultiplier;
+              }
+              
+              zombie.direction = dx > 0 ? 1 : -1;
+            }
+          } else {
+            // Oyuncu tespit edilmedi - bekle
+            zombie.state = "idle";
+          }
+          
+          // Platform kenar tespiti
+          if (zombie.type === "platform" && zombie.isGrounded) {
+            let onPlatform = false;
+            for (const plat of this.platforms) {
+              if (zombie.x + CONFIG.zombie.width > plat.x && 
+                  zombie.x < plat.x + plat.width && 
+                  zombie.y + CONFIG.zombie.height >= plat.y && 
+                  zombie.y + CONFIG.zombie.height <= plat.y + 15) {
+                onPlatform = true;
+                
+                const atLeftEdge = zombie.x <= plat.x + 10;
+                const atRightEdge = zombie.x + CONFIG.zombie.width >= plat.x + plat.width - 10;
+                
+                if ((zombie.direction === -1 && atLeftEdge) || 
+                    (zombie.direction === 1 && atRightEdge)) {
+                  zombie.direction *= -1;
+                }
+                break;
+              }
+            }
+            
+            if (!onPlatform) {
+              zombie.direction *= -1;
+            }
+          }
+        }
+      }
+
+      checkSamePlatform(player, zombie) {
+        // Oyuncu ve zombi aynı platformda mı kontrolü
+        for (const plat of this.platforms) {
+          const playerOnPlatform = player.x + CONFIG.player.width > plat.x && 
+                                 player.x < plat.x + plat.width && 
+                                 player.y + CONFIG.player.height >= plat.y && 
+                                player.y + CONFIG.player.height <= plat.y + 15;
+          
+          const zombieOnPlatform = zombie.x + CONFIG.zombie.width > plat.x && 
+                                 zombie.x < plat.x + plat.width && 
+                                 zombie.y + CONFIG.zombie.height >= plat.y && 
+                                 zombie.y + CONFIG.zombie.height <= plat.y + 15;
+          
+          if (playerOnPlatform && zombieOnPlatform) {
+            return true;
+          }
+        }
+        return false;
+      }
+
+      checkZombieHit(attackType) {
+        const p = this.state.player;
+        const attackDamage = {
+          attack1: 10,
+          attack2: 15,
+          attack3: 20
+        };
+        
+        const damage = attackDamage[attackType] || 10;
+        const attackRange = 100;
+        
+        for (const zombie of this.zombies) {
+          if (zombie.isDead) continue;
+          
+          const dx = p.x + CONFIG.player.width / 2 - (zombie.x + CONFIG.zombie.width / 2);
+          const dy = p.y + CONFIG.player.height / 2 - (zombie.y + CONFIG.zombie.height / 2);
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          
+          const isFacingZombie = (p.facing === "right" && dx < 0) || (p.facing === "left" && dx > 0);
+          
+          if (distance < attackRange && isFacingZombie) {
+            zombie.health -= damage;
+            
+            if (zombie.health <= 0) {
+              zombie.isDead = true;
+              zombie.state = "death";
+              zombie.frame = 0;
+              this.score += CONFIG.scoring.zombieKillBonus;
+              document.getElementById('score').textContent = this.score;
+            }
+          }
+        }
+      }
+
+      render() {
+        // Temizle
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        // Arkaplan çiz - Tüm ekranı kaplayacak şekilde
+        const bg = this.currentLevel === 1 ? this.assets.level1 : this.assets.level2;
+        if (bg && bg.width > 0) {
+          // Arkaplanı döşe
+          const pattern = this.ctx.createPattern(bg, 'repeat');
+          this.ctx.fillStyle = pattern;
+          this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        } else {
+          // Fallback arkaplan
+          this.ctx.fillStyle = this.currentLevel === 1 ? '#112233' : '#334455';
+          this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        }
+        
+        // Platformları çiz
+        for (const plat of this.platforms) {
+          const platformImg = this.assets[plat.type];
+          if (platformImg && platformImg.width > 0) {
+            this.ctx.drawImage(
+              platformImg,
+              0, 0, platformImg.width, platformImg.height,
+              plat.x, plat.y - this.cameraY,
+              plat.width, plat.height
+            );
+          } else {
+            // Fallback platform rendering
+            this.ctx.fillStyle = plat.type === "platform1" ? '#8B4513' : '#654321';
+            this.ctx.fillRect(
+              plat.x, plat.y - this.cameraY,
+              plat.width, plat.height
+            );
+          }
+        }
+        
+        // Eşyaları çiz
+        for (const item of this.items) {
+          if (item.collected) continue;
+          
+          const img = this.assets[item.type];
+          
+          if (img && img.width > 0) {
+            let frameWidth, frameIndex, frameX;
+            
+            if (item.type === "item1") {
+              frameWidth = img.width / CONFIG.frameCount.item1;
+              frameIndex = Math.floor(item.frame);
+              frameX = frameIndex * frameWidth;
+            } else if (item.type === "item2") {
+              frameWidth = img.width / CONFIG.frameCount.item2;
+              frameIndex = Math.floor(item.frame);
+              frameX = frameIndex * frameWidth;
+            } else if (item.type === "item3") {
+              frameWidth = img.width / CONFIG.frameCount.item3;
+              frameIndex = Math.floor(item.frame);
+              frameX = frameIndex * frameWidth;
+            } else {
+              frameWidth = img.width;
+              frameX = 0;
+            }
+            
+            this.ctx.drawImage(
+              img,
+              frameX, 0, frameWidth, img.height,
+              item.x, item.y - this.cameraY,
+              item.width, item.height
+            );
+          } else {
+            // Fallback item rendering
+            if (item.type === "item1") {
+              this.ctx.fillStyle = 'gold';
+            } else if (item.type === "item2") {
+              this.ctx.fillStyle = 'silver';
+            } else {
+              this.ctx.fillStyle = 'bronze';
+            }
+            this.ctx.beginPath();
+            this.ctx.arc(
+              item.x + item.width/2, 
+              item.y - this.cameraY + item.height/2, 
+              item.width/2, 
+              0, 
+              Math.PI * 2
+            );
+            this.ctx.fill();
+          }
+        }
+        
+        // Tuzakları çiz
+        for (const obs of this.obstacles) {
+          const img = this.assets[obs.type];
+          if (!img || img.width <= 0) continue;
+          
+          let frameWidth, frameIndex, frameX;
+          
+          if (obs.type === "saw") {
+            frameWidth = img.width / CONFIG.frameCount.saw;
+            frameIndex = Math.floor(obs.frame);
+            frameX = frameIndex * frameWidth;
+          } else if (obs.type === "axe") {
+            frameWidth = img.width / CONFIG.frameCount.axe;
+            frameIndex = Math.floor(obs.frame);
+            frameX = frameIndex * frameWidth;
+          } else if (obs.type === "tree") {
+            frameWidth = img.width / CONFIG.frameCount.tree;
+            frameIndex = Math.floor(obs.frame);
+            frameX = frameIndex * frameWidth;
+          } else if (obs.type === "spike") {
+            frameWidth = img.width / CONFIG.frameCount.spike;
+            frameIndex = Math.floor(obs.frame);
+            frameX = frameIndex * frameWidth;
+          } else if (obs.type === "branch") {
+            frameWidth = img.width;
+            frameX = 0;
+            
+            // Dalları yönüne göre çiz (sol veya sağ)
+            this.ctx.save();
+            if (obs.direction === "left") {
+              this.ctx.translate(obs.x + obs.width, 0);
+              this.ctx.scale(-1, 1);
+              this.ctx.drawImage(
+                img,
+                frameX, 0, frameWidth, img.height,
+                0, obs.y - this.cameraY,
+                obs.width, obs.height
+              );
+            } else {
+              this.ctx.drawImage(
+                img,
+                frameX, 0, frameWidth, img.height,
+                obs.x, obs.y - this.cameraY,
+                obs.width, obs.height
+              );
+            }
+            this.ctx.restore();
+            continue;
+          } else {
+            frameWidth = img.width;
+            frameX = 0;
+          }
+          
+          this.ctx.drawImage(
+            img,
+            frameX, 0, frameWidth, img.height,
+            obs.x, obs.y - this.cameraY,
+            obs.width, obs.height
+          );
+        }
+        
+        // Zombileri çiz
+        for (const zombie of this.zombies) {
+          if (zombie.isDead && zombie.state !== "death") continue;
+          
+          let zombieImg;
+          switch(zombie.state) {
+            case "attack": zombieImg = this.assets.zombie_attack; break;
+            case "walk": zombieImg = this.assets.zombie_walk; break;
+            case "idle": zombieImg = this.assets.zombie_idle; break;
+            case "death": zombieImg = this.assets.zombie_death; break;
+            default: zombieImg = this.assets.zombie_idle;
+          }
+          
+          if (!zombieImg || zombieImg.width <= 0) continue;
+          
+          const animType = `zombie_${zombie.state}`;
+          const frameCount = CONFIG.frameCount[animType] || 6;
+          const frameWidth = zombieImg.width / frameCount;
+          const frameX = frameWidth * Math.floor(zombie.frame);
+          
+          if (zombie.direction === -1) {
+            this.ctx.save();
+            this.ctx.translate(zombie.x + CONFIG.zombie.width, 0);
+            this.ctx.scale(-1, 1);
+            this.ctx.drawImage(
+              zombieImg,
+              frameX, 0, frameWidth, zombieImg.height,
+              0, zombie.y - this.cameraY,
+              CONFIG.zombie.width, CONFIG.zombie.height
+            );
+            this.ctx.restore();
+          } else {
+            this.ctx.drawImage(
+              zombieImg,
+              frameX, 0, frameWidth, zombieImg.height,
+              zombie.x, zombie.y - this.cameraY,
+              CONFIG.zombie.width, CONFIG.zombie.height
+            );
+          }
+          
+          // Sağlık çubuğu
+          if (!zombie.isDead) {
+            const healthPercent = zombie.health / CONFIG.zombie.health;
+            this.ctx.fillStyle = 'red';
+            this.ctx.fillRect(
+              zombie.x + CONFIG.zombie.width * 0.2,
+              zombie.y - this.cameraY - 5,
+              CONFIG.zombie.width * 0.6,
+              3
+            );
+            this.ctx.fillStyle = 'green';
+            this.ctx.fillRect(
+              zombie.x + CONFIG.zombie.width * 0.2,
+              zombie.y - this.cameraY - 5,
+              CONFIG.zombie.width * 0.6 * healthPercent,
+              3
+            );
+          }
+        }
+        
+        // İyileşme partikülleri
+        for (const part of this.healingParticles) {
+          this.ctx.save();
+          this.ctx.globalAlpha = part.alpha;
+          this.ctx.fillStyle = part.color;
+          this.ctx.beginPath();
+          this.ctx.arc(
+            part.x, 
+            part.y - this.cameraY, 
+            part.size, 
+            0, 
+            Math.PI * 2
+          );
+          this.ctx.fill();
+          this.ctx.restore();
+        }
+        
+        // Portal çiz (5000 skordan sonra göster)
+        if (this.score >= 5000 && this.portal) {
+          const portalImg = this.assets.portal;
+          if (portalImg && portalImg.width > 0) {
+            const frameWidth = portalImg.width / this.portal.frameCount;
+            const frameIndex = Math.floor(this.portal.frame);
+            const frameX = frameIndex * frameWidth;
+            
+            this.ctx.drawImage(
+              portalImg,
+              frameX, 0, frameWidth, portalImg.height,
+              this.portal.x, this.portal.y - this.cameraY,
+              this.portal.width, this.portal.height
+            );
+          } else {
+            // Fallback portal rendering
+            this.ctx.fillStyle = 'rgba(100, 200, 255, 0.7)';
+            this.ctx.beginPath();
+            this.ctx.arc(
+              this.portal.x + this.portal.width/2, 
+              this.portal.y - this.cameraY + this.portal.height/2, 
+              this.portal.width/2, 
+              0, 
+              Math.PI * 2
+            );
+            this.ctx.fill();
+          }
+        }
+        
+        // Oyuncuyu çiz
+        const p = this.state.player;
+        const playerImg = this.assets[p.currentAnim];
+        if (playerImg && playerImg.width > 0) {
+          const frameCount = CONFIG.frameCount[p.currentAnim] || 6;
+          const frameWidth = playerImg.width / frameCount;
+          const frameX = frameWidth * this.frameIndex;
+          
+          if (p.facing === "left") {
+            this.ctx.save();
+            this.ctx.translate(p.x + CONFIG.player.width, 0);
+            this.ctx.scale(-1, 1);
+            this.ctx.drawImage(
+              playerImg,
+              frameX, 0, frameWidth, playerImg.height,
+              0, p.y - this.cameraY,
+              CONFIG.player.width, CONFIG.player.height
+            );
+            this.ctx.restore();
+          } else {
+            this.ctx.drawImage(
+              playerImg,
+              frameX, 0, frameWidth, playerImg.height,
+              p.x, p.y - this.cameraY,
+              CONFIG.player.width, CONFIG.player.height
+            );
+          }
+        } else {
+          // Fallback player rendering
+          this.ctx.fillStyle = p.facing === "left" ? 'blue' : 'red';
+          this.ctx.fillRect(
+            p.x, p.y - this.cameraY,
+            CONFIG.player.width, CONFIG.player.height
+          );
+        }
+      }
+
+      restartGame() {
+        this.platforms = [];
+        this.obstacles = [];
+        this.items = [];
+        this.zombies = [];
+        this.healingParticles = [];
+        this.score = 0;
+        this.currentLevel = 1;
+        this.generateLevel();
+        this.loadGame();
+        document.getElementById('gameOver').style.display = 'none';
+        document.getElementById('highest').textContent = this.highestScore;
+      }
+    }
+
+    // Sayfa yüklendiğinde oyunu başlat
+    document.addEventListener('DOMContentLoaded', () => {
+      new VerticalNinjaGame();
+    });
+  </script>
+</body>
+</html>
